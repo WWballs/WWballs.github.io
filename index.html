@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Neon AI Text Generator</title>
+  <style>
+    :root {
+      --primary: #6366f1;
+      --primary-dark: #4f46e5;
+      --text: #e2e8f0;
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --success: #10b981;
+      --error: #ef4444;
+      --radius: 12px;
+      --shadow: 0 10px 15px -3px rgb(0 0 0 / 0.3);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 1rem;
+      line-height: 1.5;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 800px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 2rem;
+      box-shadow: var(--shadow);
+      display: grid;
+      gap: 1.5rem;
+    }
+
+    .header {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      background: linear-gradient(90deg, var(--primary), #a855f7);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .subtitle {
+      opacity: 0.8;
+      font-size: 0.95rem;
+    }
+
+    .input-group {
+      display: grid;
+      gap: 1rem;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 150px;
+      padding: 1rem;
+      background: rgba(30, 41, 59, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: var(--radius);
+      color: var(--text);
+      font: inherit;
+      resize: vertical;
+      transition: all 0.2s ease;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3);
+    }
+
+    button {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: var(--radius);
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    button:hover {
+      background: var(--primary-dark);
+      transform: translateY(-1px);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    .output {
+      min-height: 200px;
+      padding: 1.5rem;
+      background: rgba(30, 41, 59, 0.5);
+      border-radius: var(--radius);
+      white-space: pre-wrap;
+    }
+
+    .loading {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 1rem;
+      background: rgba(30, 41, 59, 0.8);
+      border-radius: var(--radius);
+      margin-top: 1rem;
+    }
+
+    .spinner {
+      width: 1.5rem;
+      height: 1.5rem;
+      border: 3px solid rgba(255, 255, 255, 0.1);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .progress-bar {
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+      margin-top: 0.5rem;
+      overflow: hidden;
+    }
+
+    .progress {
+      height: 100%;
+      background: var(--primary);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    .success {
+      color: var(--success);
+    }
+
+    .error {
+      color: var(--error);
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    @media (max-width: 640px) {
+      .card {
+        padding: 1.5rem;
+      }
+      
+      h1 {
+        font-size: 1.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="header">
+        <h1>AI Generator</h1>
+        <p class="subtitle">100% client-side AI powered by Transformers.js</p>
+      </div>
+
+      <div class="input-group">
+        <textarea id="input" placeholder="Ask me anything..."></textarea>
+        <button id="generate">
+          <span>Generate</span>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M5 12h14M12 5l7 7-7 7"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="progress-bar hidden" id="progress-container">
+        <div class="progress" id="progress-bar"></div>
+      </div>
+
+      <div class="loading hidden" id="loading">
+        <div class="spinner"></div>
+        <span id="loading-text">Initializing AI model...</span>
+      </div>
+
+      <div class="output" id="output"></div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.4.0"></script>
+  <script>
+    // DOM Elements
+    const input = document.getElementById('input');
+    const generateBtn = document.getElementById('generate');
+    const output = document.getElementById('output');
+    const loading = document.getElementById('loading');
+    const loadingText = document.getElementById('loading-text');
+    const progressContainer = document.getElementById('progress-container');
+    const progressBar = document.getElementById('progress-bar');
+
+    // AI Pipeline
+    let pipeline;
+
+    // Initialize model
+    async function initModel() {
+      try {
+        loading.classList.remove('hidden');
+        progressContainer.classList.remove('hidden');
+        
+        pipeline = await transformers.pipeline(
+          'text-generation',
+          'Xenova/distilgpt2',
+          {
+            progress_callback: (progress) => {
+              const percent = Math.round(progress * 100);
+              progressBar.style.width = `${percent}%`;
+              loadingText.textContent = `Downloading model... ${percent}%`;
+              
+              if (percent === 100) {
+                loadingText.textContent = 'Model ready!';
+                setTimeout(() => {
+                  loading.classList.add('hidden');
+                  progressContainer.classList.add('hidden');
+                }, 1000);
+              }
+            }
+          }
+        );
+      } catch (error) {
+        output.innerHTML = `<p class="error">Failed to load model: ${error.message}</p>`;
+      }
+    }
+
+    // Generate text
+    async function generateText() {
+      const prompt = input.value.trim();
+      
+      if (!prompt) {
+        output.innerHTML = '<p class="error">Please enter some text first!</p>';
+        return;
+      }
+
+      if (!pipeline) {
+        output.innerHTML = '<p class="error">Model not loaded yet. Please wait...</p>';
+        return;
+      }
+
+      output.textContent = '';
+      loading.classList.remove('hidden');
+      loadingText.textContent = 'Generating response...';
+
+      try {
+        const result = await pipeline(prompt, {
+          max_new_tokens: 150,
+          temperature: 0.7,
+          do_sample: true
+        });
+        
+        output.innerHTML = `<p class="success">${result[0].generated_text}</p>`;
+      } catch (error) {
+        output.innerHTML = `<p class="error">Generation failed: ${error.message}</p>`;
+      } finally {
+        loading.classList.add('hidden');
+      }
+    }
+
+    // Event listeners
+    generateBtn.addEventListener('click', generateText);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        generateText();
+      }
+    });
+
+    // Initialize on load
+    initModel();
+  </script>
+</body>
+</html>
